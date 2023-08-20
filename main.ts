@@ -180,7 +180,7 @@ export default class WikidataImporter extends Plugin {
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: "import-properties-for-active-file",
-			name: "Import Properties for active file",
+			name: "Import properties for active file",
 			callback: this.importProperties.bind(this),
 		});
 
