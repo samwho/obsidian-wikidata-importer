@@ -1,5 +1,5 @@
 {
-	"id": "obsidian-wikidata-importer",
+	"id": "wikidata-importer",
 	"name": "Wikidata Importer",
 	"version": "1.0.1",
 	"minAppVersion": "0.15.0",

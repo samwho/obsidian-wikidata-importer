@@ -123,7 +123,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			return;
 		}
 
-		let frontmatter = null;
+		let frontmatter: any | null = null;
 		await this.app.fileManager.processFrontMatter(file, (fm) => {
 			frontmatter = fm;
 		});
