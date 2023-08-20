@@ -1,7 +1,7 @@
 {
 	"id": "wikidata-importer",
 	"name": "Wikidata Importer",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
 	"description": "This plugin allows you to import data from Wikidata into your Obsidian vault.",
 	"author": "Sam Rose",
