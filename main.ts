@@ -1,6 +1,6 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 
-interface Settings {
+interface WikidataImporterSettings {
 	entityIdKey: string;
 	internalLinkPrefix: string;
 	ignoreCategories: boolean;
@@ -8,7 +8,7 @@ interface Settings {
 	overwriteExistingProperties: boolean;
 }
 
-const DEFAULT_SETTINGS: Settings = {
+const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	entityIdKey: "wikidata entity id",
 	internalLinkPrefix: "db/",
 	ignoreCategories: true,
@@ -21,8 +21,8 @@ interface WikidataEntity {
 	properties: { [key: string]: any };
 }
 
-export default class WikidataImporter extends Plugin {
-	settings: Settings;
+export default class WikidataImporterPlugin extends Plugin {
+	settings: WikidataImporterSettings;
 
 	isString(type: string): boolean {
 		return (
@@ -181,11 +181,11 @@ export default class WikidataImporter extends Plugin {
 		this.addCommand({
 			id: "import-properties-for-active-file",
 			name: "Import properties for active file",
-			callback: this.importProperties.bind(this),
+			editorCallback: this.importProperties.bind(this),
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SettingTab(this.app, this));
+		this.addSettingTab(new WikidataImporterSettingsTab(this.app, this));
 	}
 
 	onunload() {}
@@ -203,10 +203,10 @@ export default class WikidataImporter extends Plugin {
 	}
 }
 
-class SettingTab extends PluginSettingTab {
-	plugin: WikidataImporter;
+class WikidataImporterSettingsTab extends PluginSettingTab {
+	plugin: WikidataImporterPlugin;
 
-	constructor(app: App, plugin: WikidataImporter) {
+	constructor(app: App, plugin: WikidataImporterPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
