@@ -8,12 +8,14 @@ import {
 	TFile,
 } from "obsidian";
 
-import { Entity, GetPropertiesOptions } from "./src/wikidata";
+import { Entity } from "./src/wikidata";
 
 interface WikidataImporterSettings {
 	entityIdKey: string;
 	internalLinkPrefix: string;
 	ignoreCategories: boolean;
+	ignoreWikipediaPages: boolean;
+	ignoreIDs: boolean;
 	ignorePropertiesWithTimeRanges: boolean;
 	overwriteExistingProperties: boolean;
 }
@@ -22,11 +24,17 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	entityIdKey: "wikidata entity id",
 	internalLinkPrefix: "db/",
 	ignoreCategories: true,
+	ignoreWikipediaPages: true,
+	ignoreIDs: true,
 	ignorePropertiesWithTimeRanges: true,
 	overwriteExistingProperties: false,
 };
 
-async function syncEntityToFile(plugin: WikidataImporterPlugin, entity: Entity, file: TFile) {
+async function syncEntityToFile(
+	plugin: WikidataImporterPlugin,
+	entity: Entity,
+	file: TFile
+) {
 	let frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
 	if (!frontmatter) {
 		frontmatter = {};
@@ -34,7 +42,10 @@ async function syncEntityToFile(plugin: WikidataImporterPlugin, entity: Entity, 
 
 	let properties = await entity.getProperties({
 		ignoreCategories: plugin.settings.ignoreCategories,
-		ignorePropertiesWithTimeRanges: plugin.settings.ignorePropertiesWithTimeRanges,
+		ignoreWikipediaPages: plugin.settings.ignoreWikipediaPages,
+		ignoreIDs: plugin.settings.ignoreIDs,
+		ignorePropertiesWithTimeRanges:
+			plugin.settings.ignorePropertiesWithTimeRanges,
 		internalLinkPrefix: plugin.settings.internalLinkPrefix,
 	});
 
@@ -50,6 +61,10 @@ async function syncEntityToFile(plugin: WikidataImporterPlugin, entity: Entity, 
 				frontmatter[key] = value.length === 1 ? value[0] : value;
 			}
 		}
+
+		// Ensure the entity ID is always set, which may not be the case if this is
+		// the first time the entity is being imported.
+		frontmatter[plugin.settings.entityIdKey] = entity.id;
 	});
 }
 
@@ -67,16 +82,25 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	}
 
 	async onChooseSuggestion(item: Entity, evt: MouseEvent | KeyboardEvent) {
-		let prefix = this.plugin.settings.internalLinkPrefix;
-		let name = `${prefix}${item.label}.md`;
-		let file = this.app.vault.getAbstractFileByPath(name);
-		if (!(file instanceof TFile)) {
-			file = await this.app.vault.create(name, "");
-		}
-		await syncEntityToFile(this.plugin, item, file as TFile);
-		let leaf = this.app.workspace.getMostRecentLeaf()
-		if (leaf) {
-			leaf.openFile(file as TFile);
+		let loading = new Notice(`Importing entity ${item.id}...`);
+
+		try {
+			let prefix = this.plugin.settings.internalLinkPrefix;
+			let name = `${prefix}${item.label}.md`;
+			let file = this.app.vault.getAbstractFileByPath(name);
+			if (!(file instanceof TFile)) {
+				file = await this.app.vault.create(name, "");
+			}
+			await syncEntityToFile(this.plugin, item, file as TFile);
+			let leaf = this.app.workspace.getMostRecentLeaf();
+			if (leaf) {
+				leaf.openFile(file as TFile);
+			}
+		} catch (e) {
+			new Notice(`Error importing entity ${item.id}: ${e}`);
+			return;
+		} finally {
+			loading.hide();
 		}
 	}
 
@@ -112,7 +136,9 @@ export default class WikidataImporterPlugin extends Plugin {
 		try {
 			await syncEntityToFile(this, entity, file);
 		} catch (e) {
-			new Notice(`Error importing properties for entity ${entity.id}: ${e}`);
+			new Notice(
+				`Error importing properties for entity ${entity.id}: ${e}`
+			);
 			return;
 		} finally {
 			loading.hide();
@@ -133,7 +159,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			name: "Import entity",
 			callback: () => {
 				new WikidataEntitySuggestModal(this).open();
-			}
+			},
 		});
 
 		this.addSettingTab(new WikidataImporterSettingsTab(this.app, this));
@@ -204,6 +230,34 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.ignoreCategories)
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreCategories = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName('Ignore "Wikipedia:" pages')
+			.setDesc(
+				'If checked, pages starting with "Wikipedia:" (e.g. lists) will not be imported'
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.ignoreWikipediaPages)
+					.onChange(async (value) => {
+						this.plugin.settings.ignoreWikipediaPages = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Ignore ID properties")
+			.setDesc(
+				"If checked, the plethora of ID properties will not be imported"
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.ignoreIDs)
+					.onChange(async (value) => {
+						this.plugin.settings.ignoreIDs = value;
 						await this.plugin.saveSettings();
 					})
 			);
