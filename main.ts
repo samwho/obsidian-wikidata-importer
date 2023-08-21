@@ -5,10 +5,10 @@ import {
 	PluginSettingTab,
 	Setting,
 	SuggestModal,
-	requestUrl,
+	TFile,
 } from "obsidian";
 
-import { Entity, Properties } from "./src/wikidata";
+import { Entity, GetPropertiesOptions } from "./src/wikidata";
 
 interface WikidataImporterSettings {
 	entityIdKey: string;
@@ -26,35 +26,63 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	overwriteExistingProperties: false,
 };
 
-interface WikidataEntity {
-	id: string;
-	properties: { [key: string]: any };
+async function syncEntityToFile(plugin: WikidataImporterPlugin, entity: Entity, file: TFile) {
+	let frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+	if (!frontmatter) {
+		frontmatter = {};
+	}
+
+	let properties = await entity.getProperties({
+		ignoreCategories: plugin.settings.ignoreCategories,
+		ignorePropertiesWithTimeRanges: plugin.settings.ignorePropertiesWithTimeRanges,
+		internalLinkPrefix: plugin.settings.internalLinkPrefix,
+	});
+
+	for (const [key, value] of Object.entries(properties)) {
+		frontmatter[key] = value.length === 1 ? value[0] : value;
+	}
+
+	await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
+		for (const [key, value] of Object.entries(properties)) {
+			if (plugin.settings.overwriteExistingProperties) {
+				frontmatter[key] = value.length === 1 ? value[0] : value;
+			} else if (!frontmatter[key]) {
+				frontmatter[key] = value.length === 1 ? value[0] : value;
+			}
+		}
+	});
 }
 
-class WikidataEntitySuggestModal extends SuggestModal<WikidataEntity> {
-	async getSuggestions(query: string): Promise<WikidataEntity[]> {
-		const url =
-			"https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&type=item&limit=10&search=" +
-			encodeURIComponent(query);
-		const response = await requestUrl(url);
-		const json = await response.json();
-		return json.search;
-	}
+class WikidataEntitySuggestModal extends SuggestModal<Entity> {
+	plugin: WikidataImporterPlugin;
 
-	onChooseSuggestion(item: WikidataEntity, evt: MouseEvent | KeyboardEvent) {
-		throw new Error("Method not implemented.");
-	}
-
-	constructor(app: App, title: string) {
-		super(app);
+	constructor(plugin: WikidataImporterPlugin) {
+		super(plugin.app);
+		this.plugin = plugin;
 		this.setPlaceholder("Search for a Wikidata entity");
 	}
 
-	renderSuggestion(
-		entity: WikidataEntity,
-		el: HTMLElement,
-	): void {
-		el.setText(entity.id);
+	getSuggestions(query: string): Promise<Entity[]> {
+		return Entity.search(query);
+	}
+
+	async onChooseSuggestion(item: Entity, evt: MouseEvent | KeyboardEvent) {
+		let prefix = this.plugin.settings.internalLinkPrefix;
+		let name = `${prefix}${item.label}.md`;
+		let file = this.app.vault.getAbstractFileByPath(name);
+		if (!(file instanceof TFile)) {
+			file = await this.app.vault.create(name, "");
+		}
+		await syncEntityToFile(this.plugin, item, file as TFile);
+		let leaf = this.app.workspace.getMostRecentLeaf()
+		if (leaf) {
+			leaf.openFile(file as TFile);
+		}
+	}
+
+	renderSuggestion(entity: Entity, el: HTMLElement): void {
+		el.createEl("div", { text: entity.label });
+		el.createEl("small", { text: entity.description });
 	}
 }
 
@@ -80,47 +108,15 @@ export default class WikidataImporterPlugin extends Plugin {
 		}
 
 		let loading = new Notice("Loading properties from Wikidata...");
-
 		let entity = Entity.fromId(entityId);
-		let properties: Properties;
 		try {
-			properties = await entity.getProperties({
-				ignoreCategories: this.settings.ignoreCategories,
-				ignorePropertiesWithTimeRanges: this.settings
-					.ignorePropertiesWithTimeRanges,
-				internalLinkPrefix: this.settings.internalLinkPrefix,
-			});
+			await syncEntityToFile(this, entity, file);
 		} catch (e) {
-			new Notice(
-				`Error fetching properties for entity ${entityId}: ${e}`
-			);
+			new Notice(`Error importing properties for entity ${entity.id}: ${e}`);
 			return;
 		} finally {
 			loading.hide();
 		}
-
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			let imported = 0;
-			let overwritten = 0;
-			for (const [key, value] of Object.entries(properties)) {
-				if (this.settings.overwriteExistingProperties) {
-					if (frontmatter[key]) {
-						overwritten++;
-					}
-					frontmatter[key] = value.length === 1 ? value[0] : value;
-					imported++;
-				} else if (!frontmatter[key]) {
-					frontmatter[key] = value.length === 1 ? value[0] : value;
-					imported++;
-				}
-			}
-
-			let message = `Imported ${imported} properties from Wikidata entity ${entityId}`;
-			if (overwritten > 0) {
-				message += ` (overwrote ${overwritten} existing properties)`;
-			}
-			new Notice(message);
-		});
 	}
 
 	async onload() {
@@ -130,6 +126,14 @@ export default class WikidataImporterPlugin extends Plugin {
 			id: "import-properties-for-active-file",
 			name: "Import properties for active file",
 			editorCallback: this.importProperties.bind(this),
+		});
+
+		this.addCommand({
+			id: "import-entity",
+			name: "Import entity",
+			callback: () => {
+				new WikidataEntitySuggestModal(this).open();
+			}
 		});
 
 		this.addSettingTab(new WikidataImporterSettingsTab(this.app, this));

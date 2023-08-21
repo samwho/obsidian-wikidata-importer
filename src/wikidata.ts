@@ -53,11 +53,13 @@ export class Entity {
 	}
 
 	static async search(query: string): Promise<Entity[]> {
+		if (!query || query.length === 0) return [];
+
 		const url =
 			"https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&type=item&limit=10&search=" +
 			encodeURIComponent(query);
 		const response = await requestUrl(url);
-		const json: SearchResponse = await response.json();
+		const json: SearchResponse = response.json;
 		return json.search.map(Entity.fromJson);
 	}
 
@@ -90,7 +92,7 @@ export class Entity {
 			"&format=json";
 
 		const response = await requestUrl(url);
-		const json = await response.json();
+		const json = response.json;
 		const results = json.results.bindings;
 
 		const ret: Properties = {};
