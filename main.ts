@@ -1,4 +1,11 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import {
+	App,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	requestUrl,
+} from "obsidian";
 
 interface WikidataImporterSettings {
 	entityIdKey: string;
@@ -71,7 +78,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			encodeURIComponent(sparqlQuery) +
 			"&format=json";
 
-		const response = await fetch(url);
+		const response = await requestUrl(url);
 		const json = await response.json();
 		const results = json.results.bindings;
 
@@ -123,12 +130,10 @@ export default class WikidataImporterPlugin extends Plugin {
 			return;
 		}
 
-		let frontmatter: any | null = null;
-		await this.app.fileManager.processFrontMatter(file, (fm) => {
-			frontmatter = fm;
-		});
+		let frontmatter =
+			this.app.metadataCache.getFileCache(file)?.frontmatter || {};
 
-		let entityId = frontmatter![this.settings.entityIdKey];
+		let entityId = frontmatter[this.settings.entityIdKey];
 		if (!entityId || !entityId.startsWith("Q")) {
 			new Notice(
 				"To import Wikidata properties, you must define a Wikidata entity ID in the frontmatter"
@@ -216,7 +221,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName("Wikidata Entity ID Key")
+			.setName("Wikidata entity ID key")
 			.setDesc("The frontmatter key to use for the Wikidata entity ID")
 			.addText((text) =>
 				text
@@ -229,7 +234,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Internal Link Prefix")
+			.setName("Internal link prefix")
 			.setDesc(
 				"The prefix to use for internal links to Wikidata entities"
 			)
@@ -244,7 +249,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Ignore Categories")
+			.setName("Ignore categories")
 			.setDesc(
 				"If checked, categories will not be imported as properties"
 			)
@@ -258,7 +263,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Ignore Properties with Time Ranges")
+			.setName("Ignore properties with time ranges")
 			.setDesc(
 				"If checked, properties with time ranges will not be imported"
 			)
@@ -275,7 +280,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Overwrite Existing Properties")
+			.setName("Overwrite existing properties")
 			.setDesc(
 				"If checked, existing properties will be overwritten when importing"
 			)
