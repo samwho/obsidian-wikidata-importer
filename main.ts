@@ -4,8 +4,11 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	SuggestModal,
 	requestUrl,
 } from "obsidian";
+
+import { Entity, Properties } from "./src/wikidata";
 
 interface WikidataImporterSettings {
 	entityIdKey: string;
@@ -28,100 +31,35 @@ interface WikidataEntity {
 	properties: { [key: string]: any };
 }
 
-export default class WikidataImporterPlugin extends Plugin {
-	settings: WikidataImporterSettings;
-
-	isString(type: string): boolean {
-		return (
-			type === "http://www.w3.org/2001/XMLSchema#string" ||
-			type === "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString"
-		);
-	}
-
-	isInteger(type: string): boolean {
-		return type === "http://www.w3.org/2001/XMLSchema#integer";
-	}
-
-	isDecimal(type: string): boolean {
-		return type === "http://www.w3.org/2001/XMLSchema#decimal";
-	}
-
-	isDate(type: string): boolean {
-		return type === "http://www.w3.org/2001/XMLSchema#dateTime";
-	}
-
-	async getEntity(entityId: string): Promise<WikidataEntity> {
-		let sparqlQuery = `
-			SELECT ?propertyLabel ?value ?valueLabel ?valueType ?description WHERE {
-				wd:${entityId} ?propUrl ?value .
-				?property wikibase:directClaim ?propUrl .
-				OPTIONAL { wd:${entityId} schema:description ?description . FILTER (LANG(?description) = "en") }
-				BIND(DATATYPE(?value) AS ?valueType) .
-		`;
-
-		if (this.settings.ignorePropertiesWithTimeRanges) {
-			sparqlQuery += `
-				MINUS { ?value p:P580 ?startDateStatement. }
-				MINUS { ?value p:P582 ?endDateStatement. }
-			`;
-		}
-
-		sparqlQuery += `
-				SERVICE wikibase:label {
-					bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en" .
-				}
-			}
-		`;
-
+class WikidataEntitySuggestModal extends SuggestModal<WikidataEntity> {
+	async getSuggestions(query: string): Promise<WikidataEntity[]> {
 		const url =
-			"https://query.wikidata.org/sparql?query=" +
-			encodeURIComponent(sparqlQuery) +
-			"&format=json";
-
+			"https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&type=item&limit=10&search=" +
+			encodeURIComponent(query);
 		const response = await requestUrl(url);
 		const json = await response.json();
-		const results = json.results.bindings;
-
-		const ret: { [key: string]: any } = {};
-
-		results.forEach((r: any) => {
-			const key = r.propertyLabel.value;
-			const value = r.value.value;
-			const type = r.valueType ? r.valueType.value : null;
-
-			var valueLabel = r.valueLabel ? r.valueLabel.value : null;
-			if (
-				this.settings.ignoreCategories &&
-				valueLabel &&
-				valueLabel.startsWith("Category:")
-			) {
-				return;
-			}
-
-			if (this.isDate(type)) {
-				valueLabel = value;
-			} else if (this.isDecimal(type)) {
-				valueLabel = parseFloat(value);
-			} else if (this.isInteger(type)) {
-				valueLabel = parseInt(value);
-			} else if (this.isString(type)) {
-				valueLabel = value;
-			} else if (value.match(/Q\d+$/) && valueLabel) {
-				valueLabel = `[[${this.settings.internalLinkPrefix}${valueLabel}]]`;
-			}
-
-			if (ret[key]) {
-				ret[key].push(valueLabel);
-			} else {
-				ret[key] = [valueLabel];
-			}
-		});
-
-		return {
-			id: entityId,
-			properties: ret,
-		};
+		return json.search;
 	}
+
+	onChooseSuggestion(item: WikidataEntity, evt: MouseEvent | KeyboardEvent) {
+		throw new Error("Method not implemented.");
+	}
+
+	constructor(app: App, title: string) {
+		super(app);
+		this.setPlaceholder("Search for a Wikidata entity");
+	}
+
+	renderSuggestion(
+		entity: WikidataEntity,
+		el: HTMLElement,
+	): void {
+		el.setText(entity.id);
+	}
+}
+
+export default class WikidataImporterPlugin extends Plugin {
+	settings: WikidataImporterSettings;
 
 	async importProperties() {
 		let file = this.app.workspace.getActiveFile();
@@ -143,9 +81,15 @@ export default class WikidataImporterPlugin extends Plugin {
 
 		let loading = new Notice("Loading properties from Wikidata...");
 
-		let entity: WikidataEntity | null = null;
+		let entity = Entity.fromId(entityId);
+		let properties: Properties;
 		try {
-			entity = await this.getEntity(entityId);
+			properties = await entity.getProperties({
+				ignoreCategories: this.settings.ignoreCategories,
+				ignorePropertiesWithTimeRanges: this.settings
+					.ignorePropertiesWithTimeRanges,
+				internalLinkPrefix: this.settings.internalLinkPrefix,
+			});
 		} catch (e) {
 			new Notice(
 				`Error fetching properties for entity ${entityId}: ${e}`
@@ -158,7 +102,7 @@ export default class WikidataImporterPlugin extends Plugin {
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 			let imported = 0;
 			let overwritten = 0;
-			for (const [key, value] of Object.entries(entity!.properties)) {
+			for (const [key, value] of Object.entries(properties)) {
 				if (this.settings.overwriteExistingProperties) {
 					if (frontmatter[key]) {
 						overwritten++;
@@ -182,14 +126,12 @@ export default class WikidataImporterPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: "import-properties-for-active-file",
 			name: "Import properties for active file",
 			editorCallback: this.importProperties.bind(this),
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new WikidataImporterSettingsTab(this.app, this));
 	}
 
