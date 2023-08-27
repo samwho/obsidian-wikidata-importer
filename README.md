@@ -10,6 +10,4 @@ on the note.
 
 You can also import new Wikidata entries with the command `Wikidata Importer: Import entity`
 
-<video width="100%">
-  <source src="example-2.mp4" type="video/mp4">
-</video>
+<img src="example-2.gif" style="width: 100%" />
