@@ -7,3 +7,9 @@ and viola. Your note now has all of the Wikidata properties as properties
 on the note.
 
 ![](example.gif)
+
+You can also import new Wikidata entries with the command `Wikidata Importer: Import entity`
+
+<video width="100%">
+  <source src="example-2.mp4" type="video/mp4">
+</video>
