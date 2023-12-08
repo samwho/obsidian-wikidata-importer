@@ -1,7 +1,7 @@
 {
 	"id": "wikidata-importer",
 	"name": "Wikidata Importer",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"minAppVersion": "0.15.0",
 	"description": "Import data from Wikidata into your vault.",
 	"author": "Sam Rose",
