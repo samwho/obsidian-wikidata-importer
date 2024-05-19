@@ -69,19 +69,21 @@ export class Entity {
 		return json.search.map(Entity.fromJson);
 	}
 
+	static replaceCharacters(str : string, searchString : string, replaceString : string) {
+		let result = str;
+    
+		for (let i = 0; i < searchString.length; i++) {
+			const searchChar = searchString[i];
+			const replaceChar = replaceString[Math.min(i, replaceString.length - 1)];
+        
+			result = result.replace(new RegExp('\\' + searchChar, 'g'), replaceChar);
+		}
+    
+		return result;
+	}
+
 	static buildLink(link : string, label : string, id : string) : string {
-		const subst = '_';
-		label = label
-			.replace(/\\/g, subst)
-			.replace(/\*/g, subst)
-			.replace(/\//g, subst)
-			.replace(/\:/g, subst)
-			.replace(/\#/g, subst)
-			.replace(/\?/g, subst)
-			.replace(/\</g, subst)
-			.replace(/\>/g, subst)
-			.replace(/\ /g, subst)
-			.replace(/\"/g, subst);
+		label = Entity.replaceCharacters(label, '\*/:#?<> "', '_');
 
 		link = link
 			.replace(/\$\{label\}/g, label)
