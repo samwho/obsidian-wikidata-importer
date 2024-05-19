@@ -22,7 +22,7 @@ interface WikidataImporterSettings {
 
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	entityIdKey: "wikidata entity id",
-	internalLinkPrefix: "db/",
+	internalLinkPrefix: "db/${label}",
 	ignoreCategories: true,
 	ignoreWikipediaPages: true,
 	ignoreIDs: true,
@@ -85,8 +85,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 		let loading = new Notice(`Importing entity ${item.id}...`);
 
 		try {
-			let prefix = this.plugin.settings.internalLinkPrefix;
-			let name = `${prefix}${item.label}.md`;
+			let name = Entity.buildLink(this.plugin.settings.internalLinkPrefix + `.md`, item.label, item.id.substring(1));
 			let file = this.app.vault.getAbstractFileByPath(name);
 			if (!(file instanceof TFile)) {
 				file = await this.app.vault.create(name, "");
