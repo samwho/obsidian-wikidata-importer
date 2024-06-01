@@ -85,11 +85,16 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 		let loading = new Notice(`Importing entity ${item.id}...`);
 
 		try {
+			if (this.plugin.settings.internalLinkPrefix === "db/") {
+				this.plugin.settings.internalLinkPrefix = `db/{label}`;
+			}
+
 			let name = Entity.buildLink(
 				this.plugin.settings.internalLinkPrefix + `.md`,
 				item.label!,
 				item.id.substring(1)
 			);
+			console.log(name);
 			let file = this.app.vault.getAbstractFileByPath(name);
 			if (!(file instanceof TFile)) {
 				file = await this.app.vault.create(name, "");
