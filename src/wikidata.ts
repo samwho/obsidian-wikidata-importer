@@ -69,6 +69,28 @@ export class Entity {
 		return json.search.map(Entity.fromJson);
 	}
 
+	static replaceCharacters(str : string, searchString : string, replaceString : string) {
+		let result = str;
+    
+		for (let i = 0; i < searchString.length; i++) {
+			const searchChar = searchString[i];
+			const replaceChar = replaceString[Math.min(i, replaceString.length - 1)];
+        
+			result = result.replace(new RegExp('\\' + searchChar, 'g'), replaceChar);
+		}
+    
+		return result;
+	}
+
+	static buildLink(link : string, label : string, id : string) : string {
+		label = Entity.replaceCharacters(label, '\*/:#?<> "', '_');
+
+		link = link
+			.replace(/\$\{label\}/g, label)
+			.replace(/\$\{id\}/g, id);
+		return link;
+	}
+
 	// TODO: incorporate https://query.wikidata.org/#SELECT%20%3FwdLabel%20%3Fps_Label%20%3FwdpqLabel%20%3Fpq_Label%20%7B%0A%20%20VALUES%20%28%3Fcompany%29%20%7B%28wd%3AQ5284%29%7D%0A%20%20%0A%20%20%3Fcompany%20%3Fp%20%3Fstatement%20.%0A%20%20%3Fstatement%20%3Fps%20%3Fps_%20.%0A%20%20%0A%20%20%3Fwd%20wikibase%3Aclaim%20%3Fp.%0A%20%20%3Fwd%20wikibase%3AstatementProperty%20%3Fps.%0A%20%20%0A%20%20OPTIONAL%20%7B%0A%20%20%3Fstatement%20%3Fpq%20%3Fpq_%20.%0A%20%20%3Fwdpq%20wikibase%3Aqualifier%20%3Fpq%20.%0A%20%20%7D%0A%20%20%0A%20%20SERVICE%20wikibase%3Alabel%20%7B%20bd%3AserviceParam%20wikibase%3Alanguage%20%22en%22%20%7D%0A%7D%20ORDER%20BY%20%3Fwd%20%3Fstatement%20%3Fps_
 	async getProperties(opts: GetPropertiesOptions): Promise<Properties> {
 		let query = `
@@ -153,7 +175,11 @@ export class Entity {
 			} else if (isString(type)) {
 				toAdd = value;
 			} else if (value.match(/Q\d+$/) && valueLabel) {
-				toAdd = `[[${opts.internalLinkPrefix}${valueLabel}]]`;
+				let id = value.match(/\d+$/);
+				console.log("found id: " + label);
+				id = id[0];
+				var label = Entity.buildLink(opts.internalLinkPrefix, valueLabel, id);
+				toAdd = `[[${label}]]`;
 			}
 
 			if (toAdd === null) {
