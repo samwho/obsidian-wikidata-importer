@@ -82,7 +82,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	}
 
 	async onChooseSuggestion(item: Entity, evt: MouseEvent | KeyboardEvent) {
-		let loading = new Notice(`Importing entity ${item.id}...`);
+		let loading = new Notice(`wtf? bbq? Importing entity ${item.id}...`);
 
 		try {
 			if (this.plugin.settings.internalLinkPrefix === "db/") {
@@ -155,6 +155,8 @@ export default class WikidataImporterPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		console.log("WikidataImporterPlugin loaded");
 
 		this.addCommand({
 			id: "import-properties-for-active-file",
