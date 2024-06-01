@@ -91,7 +91,7 @@ export class Entity {
 	}
 
 	static buildLink(link: string, label: string, id: string): string {
-		label = Entity.replaceCharacters(label, '*/:#?<> "', "_");
+		label = Entity.replaceCharacters(label, '*/:#?<>"', "_");
 		link = link.replace(/\$\{label\}/g, label).replace(/\$\{id\}/g, id);
 		return link;
 	}
