@@ -134,8 +134,12 @@ export default class WikidataImporterPlugin extends Plugin {
 		let entityId = frontmatter[this.settings.entityIdKey];
 		if (!entityId || !entityId.startsWith("Q")) {
 			new Notice(
-				"To import Wikidata properties, you must define a Wikidata entity ID in the frontmatter"
+				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the note title "${file.basename}..."`
 			);
+			const modal = new WikidataEntitySuggestModal(this);
+			modal.open();
+			modal.inputEl.value = file.basename;
+			modal.inputEl.dispatchEvent(new Event("input"));
 			return;
 		}
 
