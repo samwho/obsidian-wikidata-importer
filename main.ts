@@ -18,6 +18,8 @@ interface WikidataImporterSettings {
 	ignoreIDs: boolean;
 	ignorePropertiesWithTimeRanges: boolean;
 	overwriteExistingProperties: boolean;
+	whitelist: string[];
+	blacklist: string[];
 }
 
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
@@ -49,16 +51,30 @@ async function syncEntityToFile(
 		internalLinkPrefix: plugin.settings.internalLinkPrefix,
 	});
 
+	const filteredProperties: string[] = [];
+
 	for (const [key, value] of Object.entries(properties)) {
+		if (
+			(plugin.settings.whitelist?.length &&
+				!plugin.settings.whitelist?.includes(key)) ||
+			plugin.settings.blacklist?.includes(key)
+		) {
+			console.log(`Skipping property ${key}`);
+			continue;
+		} else {
+			filteredProperties.push(key);
+		}
 		frontmatter[key] = value.length === 1 ? value[0] : value;
 	}
 
 	await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
 		for (const [key, value] of Object.entries(properties)) {
-			if (plugin.settings.overwriteExistingProperties) {
-				frontmatter[key] = value.length === 1 ? value[0] : value;
-			} else if (!frontmatter[key]) {
-				frontmatter[key] = value.length === 1 ? value[0] : value;
+			if (filteredProperties.includes(key)) {
+				if (plugin.settings.overwriteExistingProperties) {
+					frontmatter[key] = value.length === 1 ? value[0] : value;
+				} else if (!frontmatter[key]) {
+					frontmatter[key] = value.length === 1 ? value[0] : value;
+				}
 			}
 		}
 
@@ -298,6 +314,36 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.overwriteExistingProperties =
 							value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Blacklist properties")
+			.setDesc(
+				"Do not import properties with these labels, one per line, even if they are whitelisted"
+			)
+			.addTextArea((text) =>
+				text
+					.setPlaceholder("label1\nlabel2\n...")
+					.setValue(this.plugin.settings.blacklist?.join("\n"))
+					.onChange(async (value) => {
+						this.plugin.settings.blacklist = value.split("\n");
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Whitelist properties")
+			.setDesc(
+				"Only import properties with these labels, one per line, making the blacklist irrelevant"
+			)
+			.addTextArea((text) =>
+				text
+					.setPlaceholder("label1\nlabel2\n...")
+					.setValue(this.plugin.settings.whitelist?.join("\n"))
+					.onChange(async (value) => {
+						this.plugin.settings.whitelist = value.split("\n");
 						await this.plugin.saveSettings();
 					})
 			);
