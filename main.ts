@@ -55,11 +55,14 @@ async function syncEntityToFile(
 
 	for (const [key, value] of Object.entries(properties)) {
 		if (
+			// If the whitelist is defined, only import properties that are in the whitelist
+			// If the blacklist is defined, do not import properties that are in the blacklist
 			(plugin.settings.whitelist?.length &&
-				!plugin.settings.whitelist?.includes(key)) ||
-			plugin.settings.blacklist?.includes(key)
+				!plugin.settings.whitelist.includes(key)) ||
+			(plugin.settings.blacklist?.length &&
+				plugin.settings.blacklist.includes(key))
 		) {
-			console.log(`Skipping property ${key}`);
+			console.log(`Wikidata: skipping property ${key}`);
 			continue;
 		} else {
 			filteredProperties.push(key);
@@ -328,7 +331,10 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.setPlaceholder("label1\nlabel2\n...")
 					.setValue(this.plugin.settings.blacklist?.join("\n"))
 					.onChange(async (value) => {
-						this.plugin.settings.blacklist = value.split("\n");
+						this.plugin.settings.blacklist = value
+							.trim()
+							.split("\n")
+							.filter(Boolean);
 						await this.plugin.saveSettings();
 					})
 			);
@@ -343,7 +349,10 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.setPlaceholder("label1\nlabel2\n...")
 					.setValue(this.plugin.settings.whitelist?.join("\n"))
 					.onChange(async (value) => {
-						this.plugin.settings.whitelist = value.split("\n");
+						this.plugin.settings.whitelist = value
+							.trim()
+							.split("\n")
+							.filter(Boolean);
 						await this.plugin.saveSettings();
 					})
 			);
