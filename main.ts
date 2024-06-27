@@ -30,6 +30,8 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	ignoreIDs: true,
 	ignorePropertiesWithTimeRanges: true,
 	overwriteExistingProperties: false,
+	blacklist: [],
+	whitelist: [],
 };
 
 async function syncEntityToFile(
