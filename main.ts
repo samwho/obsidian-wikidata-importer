@@ -1,5 +1,6 @@
 import {
 	App,
+	MarkdownView,
 	Notice,
 	Plugin,
 	PluginSettingTab,
@@ -157,6 +158,49 @@ export default class WikidataImporterPlugin extends Plugin {
 		}
 	}
 
+	async importEntityFromHighlightedText() {
+		const file = this.app.workspace.getActiveFile();
+		if (!file) {
+			new Notice("No active file");
+			return;
+		}
+
+		let selection;
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (view) {
+			const view_mode = view.getMode();
+			switch (view_mode) {
+				case "preview":
+					// The plugin does not support importing entities from the preview mode yet.
+					break;
+				case "source":
+					if ("editor" in view) {
+						selection = view.editor.getSelection();
+					}
+					break;
+				default:
+					break;
+			}
+		}
+		if (!selection) {
+			new Notice("No text selected");
+			return;
+		}
+		const loading = new Notice("Loading entity from highlighted text...");
+		try {
+			// Search a Wikidata entity from the highlighted text, using the modal
+			const modal = new WikidataEntitySuggestModal(this);
+			modal.open();
+			modal.inputEl.value = selection;
+			modal.inputEl.dispatchEvent(new Event("input"));
+		} catch (e) {
+			new Notice(`Error importing entity from highlighted text: ${e}`);
+			return;
+		} finally {
+			loading.hide();
+		}
+	}
+
 	async onload() {
 		await this.loadSettings();
 
@@ -172,6 +216,12 @@ export default class WikidataImporterPlugin extends Plugin {
 			callback: () => {
 				new WikidataEntitySuggestModal(this).open();
 			},
+		});
+
+		this.addCommand({
+			id: "import-entity-from-highlighted-text",
+			name: "Import entity from highlighted text",
+			editorCallback: this.importEntityFromHighlightedText.bind(this),
 		});
 
 		this.addSettingTab(new WikidataImporterSettingsTab(this.app, this));
