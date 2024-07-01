@@ -18,8 +18,8 @@ interface WikidataImporterSettings {
 	ignoreIDs: boolean;
 	ignorePropertiesWithTimeRanges: boolean;
 	overwriteExistingProperties: boolean;
-	whitelist: string[];
-	blacklist: string[];
+	allowedProperties: string[];
+	blockedProperties: string[];
 }
 
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
@@ -30,8 +30,8 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	ignoreIDs: true,
 	ignorePropertiesWithTimeRanges: true,
 	overwriteExistingProperties: false,
-	blacklist: [],
-	whitelist: [],
+	blockedProperties: [],
+	allowedProperties: [],
 };
 
 async function syncEntityToFile(
@@ -57,12 +57,12 @@ async function syncEntityToFile(
 
 	for (const [key, value] of Object.entries(properties)) {
 		if (
-			// If the whitelist is defined, only import properties that are in the whitelist
-			// If the blacklist is defined, do not import properties that are in the blacklist
-			(plugin.settings.whitelist?.length &&
-				!plugin.settings.whitelist.includes(key)) ||
-			(plugin.settings.blacklist?.length &&
-				plugin.settings.blacklist.includes(key))
+			// If the "allowed properties" is defined, only import properties that are defined in the setting
+			// If the "blocked properties" is defined, do not import properties that are defined in the setting
+			(plugin.settings.allowedProperties?.length &&
+				!plugin.settings.allowedProperties.includes(key)) ||
+			(plugin.settings.blockedProperties?.length &&
+				plugin.settings.blockedProperties.includes(key))
 		) {
 			console.log(`Wikidata: skipping property ${key}`);
 			continue;
@@ -324,16 +324,18 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Blacklist properties")
+			.setName("Blocked properties")
 			.setDesc(
-				"Do not import properties with these labels, one per line, even if they are whitelisted"
+				"Do not import properties with these labels, one per line, even if they are allowed by the 'allowed properties' setting"
 			)
 			.addTextArea((text) =>
 				text
 					.setPlaceholder("label1\nlabel2\n...")
-					.setValue(this.plugin.settings.blacklist?.join("\n"))
+					.setValue(
+						this.plugin.settings.blockedProperties?.join("\n")
+					)
 					.onChange(async (value) => {
-						this.plugin.settings.blacklist = value
+						this.plugin.settings.blockedProperties = value
 							.trim()
 							.split("\n")
 							.filter(Boolean);
@@ -342,16 +344,18 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Whitelist properties")
+			.setName("Allowed properties")
 			.setDesc(
-				"Only import properties with these labels, one per line, making the blacklist irrelevant"
+				"Only import properties with these labels, one per line, making the 'blocked properties' irrelevant"
 			)
 			.addTextArea((text) =>
 				text
 					.setPlaceholder("label1\nlabel2\n...")
-					.setValue(this.plugin.settings.whitelist?.join("\n"))
+					.setValue(
+						this.plugin.settings.allowedProperties?.join("\n")
+					)
 					.onChange(async (value) => {
-						this.plugin.settings.whitelist = value
+						this.plugin.settings.allowedProperties = value
 							.trim()
 							.split("\n")
 							.filter(Boolean);
