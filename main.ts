@@ -19,6 +19,8 @@ interface WikidataImporterSettings {
 	ignoreIDs: boolean;
 	ignorePropertiesWithTimeRanges: boolean;
 	overwriteExistingProperties: boolean;
+	allowedProperties: string[];
+	blockedProperties: string[];
 }
 
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
@@ -29,6 +31,8 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	ignoreIDs: true,
 	ignorePropertiesWithTimeRanges: true,
 	overwriteExistingProperties: false,
+	blockedProperties: [],
+	allowedProperties: [],
 };
 
 async function syncEntityToFile(
@@ -50,16 +54,33 @@ async function syncEntityToFile(
 		internalLinkPrefix: plugin.settings.internalLinkPrefix,
 	});
 
+	const filteredProperties: string[] = [];
+
 	for (const [key, value] of Object.entries(properties)) {
+		if (
+			// If the "allowed properties" is defined, only import properties that are defined in the setting
+			// If the "blocked properties" is defined, do not import properties that are defined in the setting
+			(plugin.settings.allowedProperties?.length &&
+				!plugin.settings.allowedProperties.includes(key)) ||
+			(plugin.settings.blockedProperties?.length &&
+				plugin.settings.blockedProperties.includes(key))
+		) {
+			console.log(`Wikidata: skipping property ${key}`);
+			continue;
+		} else {
+			filteredProperties.push(key);
+		}
 		frontmatter[key] = value.length === 1 ? value[0] : value;
 	}
 
 	await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
 		for (const [key, value] of Object.entries(properties)) {
-			if (plugin.settings.overwriteExistingProperties) {
-				frontmatter[key] = value.length === 1 ? value[0] : value;
-			} else if (!frontmatter[key]) {
-				frontmatter[key] = value.length === 1 ? value[0] : value;
+			if (filteredProperties.includes(key)) {
+				if (plugin.settings.overwriteExistingProperties) {
+					frontmatter[key] = value.length === 1 ? value[0] : value;
+				} else if (!frontmatter[key]) {
+					frontmatter[key] = value.length === 1 ? value[0] : value;
+				}
 			}
 		}
 
@@ -352,6 +373,46 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.overwriteExistingProperties =
 							value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Blocked properties")
+			.setDesc(
+				"Do not import properties with these labels, one per line, even if they are allowed by the 'allowed properties' setting"
+			)
+			.addTextArea((text) =>
+				text
+					.setPlaceholder("label1\nlabel2\n...")
+					.setValue(
+						this.plugin.settings.blockedProperties?.join("\n")
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.blockedProperties = value
+							.trim()
+							.split("\n")
+							.filter(Boolean);
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Allowed properties")
+			.setDesc(
+				"Only import properties with these labels, one per line, making the 'blocked properties' irrelevant"
+			)
+			.addTextArea((text) =>
+				text
+					.setPlaceholder("label1\nlabel2\n...")
+					.setValue(
+						this.plugin.settings.allowedProperties?.join("\n")
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.allowedProperties = value
+							.trim()
+							.split("\n")
+							.filter(Boolean);
 						await this.plugin.saveSettings();
 					})
 			);
