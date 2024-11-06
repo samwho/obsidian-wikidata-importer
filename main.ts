@@ -92,10 +92,12 @@ async function syncEntityToFile(
 
 class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	plugin: WikidataImporterPlugin;
+	file_path: string | null;
 
-	constructor(plugin: WikidataImporterPlugin) {
+	constructor(plugin: WikidataImporterPlugin, file_path: string | null) {
 		super(plugin.app);
 		this.plugin = plugin;
+		this.file_path = file_path;
 		this.setPlaceholder("Search for a Wikidata entity");
 	}
 
@@ -111,11 +113,12 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 				this.plugin.settings.internalLinkPrefix = "db/${label}";
 			}
 
-			let name = Entity.buildLink(
+			const name: string = this.file_path || Entity.buildLink(
 				this.plugin.settings.internalLinkPrefix + `.md`,
 				item.label!,
 				item.id.substring(1)
 			);
+
 			console.log(name);
 			let file = this.app.vault.getAbstractFileByPath(name);
 			if (!(file instanceof TFile)) {
@@ -158,7 +161,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			new Notice(
 				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the file name "${file.basename}"...`
 			);
-			const modal = new WikidataEntitySuggestModal(this);
+			const modal = new WikidataEntitySuggestModal(this, file.path);
 			modal.open();
 			modal.inputEl.value = file.basename;
 			modal.inputEl.dispatchEvent(new Event("input"));
@@ -210,7 +213,7 @@ export default class WikidataImporterPlugin extends Plugin {
 		const loading = new Notice("Loading entity from highlighted text...");
 		try {
 			// Search a Wikidata entity from the highlighted text, using the modal
-			const modal = new WikidataEntitySuggestModal(this);
+			const modal = new WikidataEntitySuggestModal(this, null);
 			modal.open();
 			modal.inputEl.value = selection;
 			modal.inputEl.dispatchEvent(new Event("input"));
@@ -235,7 +238,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			id: "import-entity",
 			name: "Import entity",
 			callback: () => {
-				new WikidataEntitySuggestModal(this).open();
+				new WikidataEntitySuggestModal(this, null).open();
 			},
 		});
 
