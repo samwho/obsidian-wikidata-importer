@@ -156,7 +156,12 @@ export default class WikidataImporterPlugin extends Plugin {
 		let frontmatter =
 			this.app.metadataCache.getFileCache(file)?.frontmatter || {};
 
-		let entityId = frontmatter[this.settings.entityIdKey];
+		let entityId: string = frontmatter[this.settings.entityIdKey];
+		if (entityId?.startsWith("https://www.wikidata.org/wiki/")) {
+			entityId = entityId.substring(
+				"https://www.wikidata.org/wiki/".length
+			);
+		}
 		if (!entityId || !entityId.startsWith("Q")) {
 			new Notice(
 				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the file name "${file.basename}"...`
