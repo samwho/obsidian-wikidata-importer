@@ -92,10 +92,12 @@ async function syncEntityToFile(
 
 class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	plugin: WikidataImporterPlugin;
+	activeFile?: TFile;
 
-	constructor(plugin: WikidataImporterPlugin) {
+	constructor(plugin: WikidataImporterPlugin, activeFile?: TFile) {
 		super(plugin.app);
 		this.plugin = plugin;
+		this.activeFile = activeFile;
 		this.setPlaceholder("Search for a Wikidata entity");
 	}
 
@@ -103,7 +105,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 		return Entity.search(query);
 	}
 
-	async onChooseSuggestion(item: Entity, evt: MouseEvent | KeyboardEvent) {
+	async onChooseSuggestion(item: Entity, _evt: MouseEvent | KeyboardEvent) {
 		let loading = new Notice(`Importing entity ${item.id}...`);
 
 		try {
@@ -116,8 +118,9 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 				item.label!,
 				item.id.substring(1)
 			);
-			console.log(name);
-			let file = this.app.vault.getAbstractFileByPath(name);
+
+			let file =
+				this.activeFile || this.app.vault.getAbstractFileByPath(name);
 			if (!(file instanceof TFile)) {
 				file = await this.app.vault.create(name, "");
 			}
@@ -144,7 +147,7 @@ export default class WikidataImporterPlugin extends Plugin {
 	settings: WikidataImporterSettings;
 
 	async importProperties() {
-		let file = this.app.workspace.getActiveFile();
+		const file = this.app.workspace.getActiveFile();
 		if (!file) {
 			new Notice("No active file");
 			return;
@@ -158,7 +161,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			new Notice(
 				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the file name "${file.basename}"...`
 			);
-			const modal = new WikidataEntitySuggestModal(this);
+			const modal = new WikidataEntitySuggestModal(this, file);
 			modal.open();
 			modal.inputEl.value = file.basename;
 			modal.inputEl.dispatchEvent(new Event("input"));
