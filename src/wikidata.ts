@@ -9,11 +9,16 @@ export interface SearchResponse {
 }
 
 export interface GetPropertiesOptions {
+	language: string;
 	ignoreCategories: boolean;
 	ignoreWikipediaPages: boolean;
 	ignoreIDs: boolean;
 	ignorePropertiesWithTimeRanges: boolean;
 	internalLinkPrefix: string;
+}
+
+export interface SearchOptions {
+	language: string;
 }
 
 function isString(type: string | null): boolean {
@@ -58,12 +63,13 @@ export class Entity {
 		return new Entity(id);
 	}
 
-	static async search(query: string): Promise<Entity[]> {
+	static async search(query: string, opts: SearchOptions): Promise<Entity[]> {
 		if (!query || query.length === 0) return [];
 
 		const url =
-			"https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&type=item&limit=10&search=" +
+			`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${opts.language}&uselang=${opts.language}&type=item&limit=10&search=` +
 			encodeURIComponent(query);
+		console.log(url);
 		const response = await requestUrl(url);
 		const json: SearchResponse = response.json;
 		return json.search.map(Entity.fromJson);
@@ -102,7 +108,7 @@ export class Entity {
 			SELECT ?propertyLabel ?value ?valueLabel ?valueType ?normalizedValue ?description WHERE {
 				wd:${this.id} ?propUrl ?value .
 				?property wikibase:directClaim ?propUrl .
-				OPTIONAL { wd:${this.id} schema:description ?description . FILTER (LANG(?description) = "en") }
+				OPTIONAL { wd:${this.id} schema:description ?description . FILTER (LANG(?description) = "${opts.language}") }
 				OPTIONAL {
 					?statement psn:P31 ?normalizedValue .
 					?normalizedValue wikibase:quantityUnit ?unit .
@@ -120,7 +126,7 @@ export class Entity {
 
 		query += `
 				SERVICE wikibase:label {
-					bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en" .
+					bd:serviceParam wikibase:language "[AUTO_LANGUAGE],${opts.language}" .
 				}
 			}
 		`;

@@ -21,6 +21,7 @@ interface WikidataImporterSettings {
 	overwriteExistingProperties: boolean;
 	allowedProperties: string[];
 	blockedProperties: string[];
+	language: string;
 }
 
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	overwriteExistingProperties: false,
 	blockedProperties: [],
 	allowedProperties: [],
+	language: "en",
 };
 
 async function syncEntityToFile(
@@ -46,6 +48,7 @@ async function syncEntityToFile(
 	}
 
 	let properties = await entity.getProperties({
+		language: plugin.settings.language,
 		ignoreCategories: plugin.settings.ignoreCategories,
 		ignoreWikipediaPages: plugin.settings.ignoreWikipediaPages,
 		ignoreIDs: plugin.settings.ignoreIDs,
@@ -102,7 +105,9 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	}
 
 	getSuggestions(query: string): Promise<Entity[]> {
-		return Entity.search(query);
+		return Entity.search(query, {
+			language: this.plugin.settings.language,
+		});
 	}
 
 	async onChooseSuggestion(item: Entity, _evt: MouseEvent | KeyboardEvent) {
@@ -282,6 +287,19 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+
+		new Setting(containerEl)
+			.setName("Language")
+			.setDesc("The language to use for Wikidata entities")
+			.addText((text) =>
+				text
+					.setPlaceholder(DEFAULT_SETTINGS.language)
+					.setValue(this.plugin.settings.language)
+					.onChange(async (value) => {
+						this.plugin.settings.language = value;
+						await this.plugin.saveSettings();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName("Wikidata entity ID key")
