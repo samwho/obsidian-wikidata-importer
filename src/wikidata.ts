@@ -175,7 +175,7 @@ export class Entity {
 			}
 
 			if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
-				key = key.replace(/[^\p{L}]/gu, opts.spaceReplacement);
+				key = key.replace(/[^\p{L}]+/gu, opts.spaceReplacement);
 			}
 
 			let toAdd: Value | null = valueLabel;
