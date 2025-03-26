@@ -14,6 +14,7 @@ import { Entity } from "./src/wikidata";
 interface WikidataImporterSettings {
 	entityIdKey: string;
 	internalLinkPrefix: string;
+	spaceReplacement: string;
 	ignoreCategories: boolean;
 	ignoreWikipediaPages: boolean;
 	ignoreIDs: boolean;
@@ -27,6 +28,7 @@ interface WikidataImporterSettings {
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	entityIdKey: "wikidata entity id",
 	internalLinkPrefix: "db/${label}",
+	spaceReplacement: "_",
 	ignoreCategories: true,
 	ignoreWikipediaPages: true,
 	ignoreIDs: true,
@@ -55,6 +57,7 @@ async function syncEntityToFile(
 		ignorePropertiesWithTimeRanges:
 			plugin.settings.ignorePropertiesWithTimeRanges,
 		internalLinkPrefix: plugin.settings.internalLinkPrefix,
+		spaceReplacement: plugin.settings.spaceReplacement,
 	});
 
 	const filteredProperties: string[] = [];
@@ -313,6 +316,21 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+		.setName("Replace-String for non-Letter characters in Properties")
+		.setDesc(
+			"Clear this to keep all non-Letter characters in Wikidata property names and leave them unchanged"
+		)
+		.addText((text) =>
+			text
+				.setPlaceholder(DEFAULT_SETTINGS.spaceReplacement)
+				.setValue(this.plugin.settings.spaceReplacement)
+				.onChange(async (value) => {
+					this.plugin.settings.spaceReplacement = value;
+					await this.plugin.saveSettings();
+				})
+		);
 
 		new Setting(containerEl)
 			.setName("Internal link prefix")
