@@ -320,7 +320,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 		new Setting(containerEl)
 		.setName("Non-letter character replacement string (properties only)")
 		.setDesc(
-			"Clear this to keep all non-Letter characters in Wikidata property names and leave them unchanged"
+			"If this is set, non-letter characters in property names will be replaced with this value. Use this to replace spaces with, e.g. the underscore character such that you don't have to quote your property names when searching your vault."
 		)
 		.addText((text) =>
 			text
