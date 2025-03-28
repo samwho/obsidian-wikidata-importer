@@ -28,7 +28,7 @@ interface WikidataImporterSettings {
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	entityIdKey: "wikidata entity id",
 	internalLinkPrefix: "db/${label}",
-	spaceReplacement: "_",
+	spaceReplacement: "",
 	ignoreCategories: true,
 	ignoreWikipediaPages: true,
 	ignoreIDs: true,
