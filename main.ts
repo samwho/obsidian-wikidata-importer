@@ -71,7 +71,6 @@ async function syncEntityToFile(
 			(plugin.settings.blockedProperties?.length &&
 				plugin.settings.blockedProperties.includes(key))
 		) {
-			console.log(`Wikidata: skipping property ${key}`);
 			continue;
 		} else {
 			filteredProperties.push(key);
@@ -318,19 +317,21 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-		.setName("Non-letter character replacement string (properties only)")
-		.setDesc(
-			"If this is set, non-letter characters in property names will be replaced with this value. Use this to replace spaces with, e.g. the underscore character such that you don't have to quote your property names when searching your vault."
-		)
-		.addText((text) =>
-			text
-				.setPlaceholder(DEFAULT_SETTINGS.spaceReplacement)
-				.setValue(this.plugin.settings.spaceReplacement)
-				.onChange(async (value) => {
-					this.plugin.settings.spaceReplacement = value;
-					await this.plugin.saveSettings();
-				})
-		);
+			.setName(
+				"Non-letter character replacement string (properties only)"
+			)
+			.setDesc(
+				"If this is set, non-letter characters in property names will be replaced with this value. Use this to replace spaces with, e.g. the underscore character such that you don't have to quote your property names when searching your vault."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder(DEFAULT_SETTINGS.spaceReplacement)
+					.setValue(this.plugin.settings.spaceReplacement)
+					.onChange(async (value) => {
+						this.plugin.settings.spaceReplacement = value;
+						await this.plugin.saveSettings();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName("Internal link prefix")

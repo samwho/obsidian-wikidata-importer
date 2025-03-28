@@ -70,7 +70,6 @@ export class Entity {
 		const url =
 			`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${opts.language}&uselang=${opts.language}&type=item&limit=10&search=` +
 			encodeURIComponent(query);
-		console.log(url);
 		const response = await requestUrl(url);
 		const json: SearchResponse = response.json;
 		return json.search.map(Entity.fromJson);
