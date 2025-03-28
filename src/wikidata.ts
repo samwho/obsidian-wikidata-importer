@@ -15,6 +15,7 @@ export interface GetPropertiesOptions {
 	ignoreIDs: boolean;
 	ignorePropertiesWithTimeRanges: boolean;
 	internalLinkPrefix: string;
+	spaceReplacement: string;
 }
 
 export interface SearchOptions {
@@ -143,7 +144,7 @@ export class Entity {
 		const ret: Properties = {};
 
 		results.forEach((r: any) => {
-			const key: string = r.propertyLabel.value;
+			let key: string = r.propertyLabel.value;
 			const value: string = r.value.value;
 			const normalizedValue: string | null = r.normalizedValue
 				? r.normalizedValue.value
@@ -171,6 +172,10 @@ export class Entity {
 
 			if (opts.ignoreIDs && valueLabel && key.match(/\bID\b/)) {
 				return;
+			}
+
+			if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
+				key = key.replace(/[^\d\p{L}]+/gu, opts.spaceReplacement);
 			}
 
 			let toAdd: Value | null = valueLabel;
