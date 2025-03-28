@@ -318,7 +318,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-		.setName("Replace-String for non-Letter characters in Properties")
+		.setName("Non-letter character replacement string (properties only)")
 		.setDesc(
 			"Clear this to keep all non-Letter characters in Wikidata property names and leave them unchanged"
 		)
