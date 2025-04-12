@@ -50,8 +50,8 @@ function isString(type: string | null): boolean {
 
 function urlForSearch(query: string, opts: SearchOptions): string {
 	return "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&type=item&limit=10"
+	+ `&language=${opts.language}&uselang=${opts.language}`
 	+ "&search=" + encodeURIComponent(query)
-	+ (opts.language ? `&language=${opts.language}&uselang=${opts.language}` : '');
 }
 
 function isInteger(type: string | null): boolean {
