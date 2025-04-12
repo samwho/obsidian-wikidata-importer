@@ -67,14 +67,19 @@ export class Entity {
 	static async search(query: string, opts: SearchOptions): Promise<Entity[]> {
 		if (!query || query.length === 0) return [];
 
-		const url =
-			`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${opts.language}&uselang=${opts.language}&type=item&limit=10&search=` +
-			encodeURIComponent(query);
+		const url = urlForSearch(query, opts);
 		console.log(url);
 		const response = await requestUrl(url);
 		const json: SearchResponse = response.json;
 		return json.search.map(Entity.fromJson);
 	}
+
+	static urlForSearch(query: string, opts: SearchOptions): string {
+		return "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&type=item&limit=10"
+		     + "&search=" + encodeURIComponent(query)
+		     + (opts.language ? `&language=${opts.language}&uselang=${opts.language}` : '')
+	}
+
 
 	static replaceCharacters(
 		str: string,
@@ -97,7 +102,7 @@ export class Entity {
 		return result;
 	}
 
-	static buildLink(link: string, label: string, id: string): string {
+	static buildObsidianVaultInternalLink(link: string, label: string, id: string): string {
 		label = Entity.replaceCharacters(label, '*/:#?<>"', "_");
 		link = link.replace(/\$\{label\}/g, label).replace(/\$\{id\}/g, id);
 		return link;
@@ -192,7 +197,7 @@ export class Entity {
 				toAdd = value;
 			} else if (value.match(/Q\d+$/) && valueLabel) {
 				let id = value.match(/\d+$/)!;
-				var label = Entity.buildLink(
+				var label = Entity.buildObsidianVaultInternalLink(
 					opts.internalLinkPrefix,
 					valueLabel,
 					id[0]
