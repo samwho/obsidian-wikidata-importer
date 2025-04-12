@@ -6,6 +6,7 @@ import {
 	PluginSettingTab,
 	Setting,
 	SuggestModal,
+	EntitySearchResult,
 	TFile,
 } from "obsidian";
 
@@ -110,6 +111,11 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	getSuggestions(query: string): Promise<Entity[]> {
 		return Entity.search(query, {
 			language: this.plugin.settings.language,
+		}).then((result: EntitySearchResult) => {
+			if (result.error) {
+				new Notice(`Error when searching for entities: ${result.error}`);
+			}
+			return result.entities;
 		});
 	}
 

@@ -3,9 +3,27 @@ import { requestUrl } from "obsidian";
 export type Value = string | number | boolean;
 export type Properties = { [key: string]: Array<Value> };
 
-export interface SearchResponse {
-	search: Entity[];
+/**
+ * DTO returned by the wikidata search API.
+ */
+interface WikidataApiEntity {
+	id: string;
+	label?: string;
+	description?: string;
+}
+
+/**
+ * DTO returned by the wikidata search API.
+ */
+interface WikidataApiSearchResult {
+	search?: WikidataApiEntity[];
+	error?: { code: string, info: string };
 	success: number;
+}
+
+export interface EntitySearchResult {
+	entities: Entity[];
+	error?: string | undefined;
 }
 
 export interface GetPropertiesOptions {
@@ -28,6 +46,12 @@ function isString(type: string | null): boolean {
 		type === "http://www.w3.org/2001/XMLSchema#string" ||
 		type === "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString"
 	);
+}
+
+function urlForSearch(query: string, opts: SearchOptions): string {
+	return "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&type=item&limit=10"
+	+ "&search=" + encodeURIComponent(query)
+	+ (opts.language ? `&language=${opts.language}&uselang=${opts.language}` : '');
 }
 
 function isInteger(type: string | null): boolean {
@@ -56,7 +80,7 @@ export class Entity {
 		this.description = description;
 	}
 
-	static fromJson(json: any): Entity {
+	static fromJson(json: WikidataApiEntity): Entity {
 		return new Entity(json.id, json.label, json.description);
 	}
 
@@ -64,22 +88,20 @@ export class Entity {
 		return new Entity(id);
 	}
 
-	static async search(query: string, opts: SearchOptions): Promise<Entity[]> {
-		if (!query || query.length === 0) return [];
-
+	static async search(query: string, opts: SearchOptions): Promise<EntitySearchResult> {
 		const url = urlForSearch(query, opts);
 		console.log(url);
+		if (!query || query.length === 0) {
+			return { entities: [] };
+		}
+
 		const response = await requestUrl(url);
-		const json: SearchResponse = response.json;
-		return json.search.map(Entity.fromJson);
+		const json: WikidataApiSearchResult = response.json;
+		return {
+			entities: json.search ? json.search.map(Entity.fromJson) : [],
+			error: json.error ? json.error.info : undefined,
+		};
 	}
-
-	static urlForSearch(query: string, opts: SearchOptions): string {
-		return "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&type=item&limit=10"
-		     + "&search=" + encodeURIComponent(query)
-		     + (opts.language ? `&language=${opts.language}&uselang=${opts.language}` : '')
-	}
-
 
 	static replaceCharacters(
 		str: string,
