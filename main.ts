@@ -127,7 +127,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 				this.plugin.settings.internalLinkPrefix = "db/${label}";
 			}
 
-			let name = Entity.buildLink(
+			const name = Entity.buildObsidianVaultInternalLink(
 				this.plugin.settings.internalLinkPrefix + `.md`,
 				item.label!,
 				item.id.substring(1)
