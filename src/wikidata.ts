@@ -150,7 +150,7 @@ export class Entity {
 				? r.normalizedValue.value
 				: null;
 			const type: string | null = r.valueType ? r.valueType.value : null;
-			const valueLabel: string | null = r.valueLabel
+			let valueLabel: string | null = r.valueLabel
 				? r.valueLabel.value
 				: null;
 
@@ -192,6 +192,9 @@ export class Entity {
 				toAdd = value;
 			} else if (value.match(/Q\d+$/) && valueLabel) {
 				let id = value.match(/\d+$/)!;
+				if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
+					valueLabel = valueLabel.replace(/[^\d\p{L},.~!$&'()+,;=@]+/gu, opts.spaceReplacement);
+				}
 				var label = Entity.buildLink(
 					opts.internalLinkPrefix,
 					valueLabel,
