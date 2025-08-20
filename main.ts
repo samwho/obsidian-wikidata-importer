@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	overwriteExistingProperties: false,
 	blockedProperties: [],
 	allowedProperties: [],
-	language: "en",
+	language: "mul,en",
 };
 
 async function syncEntityToFile(
