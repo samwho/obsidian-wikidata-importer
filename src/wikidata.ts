@@ -66,14 +66,28 @@ export class Entity {
 
 	static async search(query: string, opts: SearchOptions): Promise<Entity[]> {
 		if (!query || query.length === 0) return [];
-
-		const url =
-			`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${opts.language}&uselang=${opts.language}&type=item&limit=10&search=` +
-			encodeURIComponent(query);
-		console.log(url);
-		const response = await requestUrl(url);
-		const json: SearchResponse = response.json;
-		return json.search.map(Entity.fromJson);
+		// support multiple comma-separated languages like "mul,en"
+		const languages = opts.language.split(",").map(l => l.trim()).filter(Boolean);
+		const allResults = new Map<string, Entity>();
+		for (const lang of languages) {
+			const url =
+				`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json` +
+				`&language=${lang}&uselang=${lang}&type=item&limit=10&search=` +
+				encodeURIComponent(query);
+			console.log("Wikidata search:", url);
+			try {
+				const response = await requestUrl(url);
+				const json: SearchResponse = response.json;
+				for (const result of json.search) {
+					if (!allResults.has(result.id)) {
+						allResults.set(result.id, Entity.fromJson(result));
+						}
+					}
+				} catch (e) {
+				console.warn(`Wikidata search failed for language "${lang}":`, e);
+				}
+			}
+		return Array.from(allResults.values());
 	}
 
 	static replaceCharacters(
