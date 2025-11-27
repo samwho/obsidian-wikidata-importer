@@ -57,6 +57,15 @@ export class Entity {
 	}
 
 	static fromJson(json: any): Entity {
+		if (!json.id || typeof json.id !== "string") {
+			throw new Error("Invalid entity ID");
+		}
+		if (!json.label || typeof json.label !== "string") {
+			throw new Error("Invalid entity label");
+		}
+		if (!json.description || typeof json.description !== "string") {
+			throw new Error("Invalid entity description");
+		}
 		return new Entity(json.id, json.label, json.description);
 	}
 
@@ -66,19 +75,37 @@ export class Entity {
 
 	static async search(query: string, opts: SearchOptions): Promise<Entity[]> {
 		if (!query || query.length === 0) return [];
-
-		const url =
-			`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${opts.language}&uselang=${opts.language}&type=item&limit=10&search=` +
-			encodeURIComponent(query);
-		const response = await requestUrl(url);
-		const json: SearchResponse = response.json;
-		return json.search.map(Entity.fromJson);
+		// support multiple comma-separated languages like "mul,en"
+		const languages = opts.language
+			.split(",")
+			.map((l) => l.trim())
+			.filter(Boolean);
+		const allResults = new Map<string, Entity>();
+		for (const lang of languages) {
+			const url = `https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${lang}&uselang=${lang}&type=item&limit=10&search=${encodeURIComponent(query)}`;
+			console.log("Wikidata search:", url);
+			try {
+				const response = await requestUrl(url);
+				const json: SearchResponse = response.json;
+				for (const result of json.search) {
+					if (!allResults.has(result.id)) {
+						allResults.set(result.id, Entity.fromJson(result));
+					}
+				}
+			} catch (e) {
+				console.warn(
+					`Wikidata search failed for language "${lang}":`,
+					e,
+				);
+			}
+		}
+		return Array.from(allResults.values());
 	}
 
 	static replaceCharacters(
 		str: string,
 		searchString: string,
-		replaceString: string
+		replaceString: string,
 	) {
 		let result = str;
 
@@ -88,8 +115,8 @@ export class Entity {
 				replaceString[Math.min(i, replaceString.length - 1)];
 
 			result = result.replace(
-				new RegExp("\\" + searchChar, "g"),
-				replaceChar
+				new RegExp(`\\${searchChar}`, "g"),
+				replaceChar,
 			);
 		}
 
@@ -97,9 +124,10 @@ export class Entity {
 	}
 
 	static buildLink(link: string, label: string, id: string): string {
-		label = Entity.replaceCharacters(label, '*/:#?<>"', "_");
-		link = link.replace(/\$\{label\}/g, label).replace(/\$\{id\}/g, id);
-		return link;
+		const sanitisedLabel = Entity.replaceCharacters(label, '*/:#?<>"', "_");
+		return link
+			.replace(/\$\{label\}/g, sanitisedLabel)
+			.replace(/\$\{id\}/g, id);
 	}
 
 	// TODO: incorporate https://query.wikidata.org/#SELECT%20%3FwdLabel%20%3Fps_Label%20%3FwdpqLabel%20%3Fpq_Label%20%7B%0A%20%20VALUES%20%28%3Fcompany%29%20%7B%28wd%3AQ5284%29%7D%0A%20%20%0A%20%20%3Fcompany%20%3Fp%20%3Fstatement%20.%0A%20%20%3Fstatement%20%3Fps%20%3Fps_%20.%0A%20%20%0A%20%20%3Fwd%20wikibase%3Aclaim%20%3Fp.%0A%20%20%3Fwd%20wikibase%3AstatementProperty%20%3Fps.%0A%20%20%0A%20%20OPTIONAL%20%7B%0A%20%20%3Fstatement%20%3Fpq%20%3Fpq_%20.%0A%20%20%3Fwdpq%20wikibase%3Aqualifier%20%3Fpq%20.%0A%20%20%7D%0A%20%20%0A%20%20SERVICE%20wikibase%3Alabel%20%7B%20bd%3AserviceParam%20wikibase%3Alanguage%20%22en%22%20%7D%0A%7D%20ORDER%20BY%20%3Fwd%20%3Fstatement%20%3Fps_
@@ -131,10 +159,7 @@ export class Entity {
 			}
 		`;
 
-		const url =
-			"https://query.wikidata.org/sparql?query=" +
-			encodeURIComponent(query) +
-			"&format=json";
+		const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(query)}&format=json`;
 
 		const response = await requestUrl(url);
 		const json = response.json;
@@ -142,7 +167,7 @@ export class Entity {
 
 		const ret: Properties = {};
 
-		results.forEach((r: any) => {
+		for (const r of results) {
 			let key: string = r.propertyLabel.value;
 			const value: string = r.value.value;
 			const normalizedValue: string | null = r.normalizedValue
@@ -158,7 +183,7 @@ export class Entity {
 				valueLabel &&
 				valueLabel.startsWith("Category:")
 			) {
-				return;
+				continue;
 			}
 
 			if (
@@ -166,11 +191,11 @@ export class Entity {
 				valueLabel &&
 				valueLabel.startsWith("Wikipedia:")
 			) {
-				return;
+				continue;
 			}
 
 			if (opts.ignoreIDs && valueLabel && key.match(/\bID\b/)) {
-				return;
+				continue;
 			}
 
 			if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
@@ -184,23 +209,26 @@ export class Entity {
 			} else if (isDate(type)) {
 				toAdd = value;
 			} else if (isDecimal(type)) {
-				toAdd = parseFloat(value);
+				toAdd = Number.parseFloat(value);
 			} else if (isInteger(type)) {
-				toAdd = parseInt(value);
+				toAdd = Number.parseInt(value);
 			} else if (isString(type)) {
 				toAdd = value;
 			} else if (value.match(/Q\d+$/) && valueLabel) {
-				let id = value.match(/\d+$/)!;
-				var label = Entity.buildLink(
+				const id = value.match(/\d+$/);
+				if (!id) {
+					continue;
+				}
+				const label = Entity.buildLink(
 					opts.internalLinkPrefix,
 					valueLabel,
-					id[0]
+					id[0],
 				);
 				toAdd = `[[${label}]]`;
 			}
 
 			if (toAdd === null) {
-				return;
+				continue;
 			}
 
 			if (ret[key]) {
@@ -208,7 +236,7 @@ export class Entity {
 			} else {
 				ret[key] = [toAdd];
 			}
-		});
+		}
 
 		return ret;
 	}

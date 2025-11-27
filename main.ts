@@ -1,5 +1,5 @@
 import {
-	App,
+	type App,
 	MarkdownView,
 	Notice,
 	Plugin,
@@ -36,20 +36,20 @@ const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	overwriteExistingProperties: false,
 	blockedProperties: [],
 	allowedProperties: [],
-	language: "en",
+	language: "mul,en",
 };
 
 async function syncEntityToFile(
 	plugin: WikidataImporterPlugin,
 	entity: Entity,
-	file: TFile
+	file: TFile,
 ) {
 	let frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
 	if (!frontmatter) {
 		frontmatter = {};
 	}
 
-	let properties = await entity.getProperties({
+	const properties = await entity.getProperties({
 		language: plugin.settings.language,
 		ignoreCategories: plugin.settings.ignoreCategories,
 		ignoreWikipediaPages: plugin.settings.ignoreWikipediaPages,
@@ -72,9 +72,8 @@ async function syncEntityToFile(
 				plugin.settings.blockedProperties.includes(key))
 		) {
 			continue;
-		} else {
-			filteredProperties.push(key);
 		}
+		filteredProperties.push(key);
 		frontmatter[key] = value.length === 1 ? value[0] : value;
 	}
 
@@ -113,17 +112,17 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 	}
 
 	async onChooseSuggestion(item: Entity, _evt: MouseEvent | KeyboardEvent) {
-		let loading = new Notice(`Importing entity ${item.id}...`);
+		const loading = new Notice(`Importing entity ${item.id}...`);
 
 		try {
 			if (this.plugin.settings.internalLinkPrefix === "db/") {
 				this.plugin.settings.internalLinkPrefix = "db/${label}";
 			}
 
-			let name = Entity.buildLink(
-				this.plugin.settings.internalLinkPrefix + `.md`,
-				item.label!,
-				item.id.substring(1)
+			const name = Entity.buildLink(
+				`${this.plugin.settings.internalLinkPrefix}.md`,
+				item.label || "",
+				item.id.substring(1),
 			);
 
 			let file =
@@ -132,7 +131,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 				file = await this.app.vault.create(name, "");
 			}
 			await syncEntityToFile(this.plugin, item, file as TFile);
-			let leaf = this.app.workspace.getMostRecentLeaf();
+			const leaf = this.app.workspace.getMostRecentLeaf();
 			if (leaf) {
 				leaf.openFile(file as TFile);
 			}
@@ -160,18 +159,18 @@ export default class WikidataImporterPlugin extends Plugin {
 			return;
 		}
 
-		let frontmatter =
+		const frontmatter =
 			this.app.metadataCache.getFileCache(file)?.frontmatter || {};
 
 		let entityId: string = frontmatter[this.settings.entityIdKey];
 		if (entityId?.startsWith("https://www.wikidata.org/wiki/")) {
 			entityId = entityId.substring(
-				"https://www.wikidata.org/wiki/".length
+				"https://www.wikidata.org/wiki/".length,
 			);
 		}
 		if (!entityId || !entityId.startsWith("Q")) {
 			new Notice(
-				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the file name "${file.basename}"...`
+				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the file name "${file.basename}"...`,
 			);
 			const modal = new WikidataEntitySuggestModal(this, file);
 			modal.open();
@@ -180,13 +179,13 @@ export default class WikidataImporterPlugin extends Plugin {
 			return;
 		}
 
-		let loading = new Notice("Loading properties from Wikidata...");
-		let entity = Entity.fromId(entityId);
+		const loading = new Notice("Loading properties from Wikidata...");
+		const entity = Entity.fromId(entityId);
 		try {
 			await syncEntityToFile(this, entity, file);
 		} catch (e) {
 			new Notice(
-				`Error importing properties for entity ${entity.id}: ${e}`
+				`Error importing properties for entity ${entity.id}: ${e}`,
 			);
 			return;
 		} finally {
@@ -201,7 +200,7 @@ export default class WikidataImporterPlugin extends Plugin {
 			return;
 		}
 
-		let selection;
+		let selection: string | undefined;
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (view) {
 			const view_mode = view.getMode();
@@ -269,7 +268,7 @@ export default class WikidataImporterPlugin extends Plugin {
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			await this.loadData()
+			await this.loadData(),
 		);
 	}
 
@@ -300,7 +299,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.language = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -313,15 +312,15 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.entityIdKey = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName(
-				"Non-letter character replacement string (properties only)"
+				"Non-letter character replacement string (properties only)",
 			)
 			.setDesc(
-				"If this is set, non-letter characters in property names will be replaced with this value. Use this to replace spaces with, e.g. the underscore character such that you don't have to quote your property names when searching your vault."
+				"If this is set, non-letter characters in property names will be replaced with this value. Use this to replace spaces with, e.g. the underscore character such that you don't have to quote your property names when searching your vault.",
 			)
 			.addText((text) =>
 				text
@@ -330,13 +329,13 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.spaceReplacement = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Internal link prefix")
 			.setDesc(
-				"The prefix to use for internal links to Wikidata entities"
+				"The prefix to use for internal links to Wikidata entities",
 			)
 			.addText((text) =>
 				text
@@ -345,13 +344,13 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.internalLinkPrefix = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Ignore categories")
 			.setDesc(
-				"If checked, categories will not be imported as properties"
+				"If checked, categories will not be imported as properties",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -359,13 +358,13 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreCategories = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName('Ignore "Wikipedia:" pages')
 			.setDesc(
-				'If checked, pages starting with "Wikipedia:" (e.g. lists) will not be imported'
+				'If checked, pages starting with "Wikipedia:" (e.g. lists) will not be imported',
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -373,13 +372,13 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreWikipediaPages = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Ignore ID properties")
 			.setDesc(
-				"If checked, the plethora of ID properties will not be imported"
+				"If checked, the plethora of ID properties will not be imported",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -387,30 +386,30 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.ignoreIDs = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Ignore properties with time ranges")
 			.setDesc(
-				"If checked, properties with time ranges will not be imported"
+				"If checked, properties with time ranges will not be imported",
 			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(
-						this.plugin.settings.ignorePropertiesWithTimeRanges
+						this.plugin.settings.ignorePropertiesWithTimeRanges,
 					)
 					.onChange(async (value) => {
 						this.plugin.settings.ignorePropertiesWithTimeRanges =
 							value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Overwrite existing properties")
 			.setDesc(
-				"If checked, existing properties will be overwritten when importing"
+				"If checked, existing properties will be overwritten when importing",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -419,19 +418,19 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 						this.plugin.settings.overwriteExistingProperties =
 							value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Blocked properties")
 			.setDesc(
-				"Do not import properties with these labels, one per line, even if they are allowed by the 'allowed properties' setting"
+				"Do not import properties with these labels, one per line, even if they are allowed by the 'allowed properties' setting",
 			)
 			.addTextArea((text) =>
 				text
 					.setPlaceholder("label1\nlabel2\n...")
 					.setValue(
-						this.plugin.settings.blockedProperties?.join("\n")
+						this.plugin.settings.blockedProperties?.join("\n"),
 					)
 					.onChange(async (value) => {
 						this.plugin.settings.blockedProperties = value
@@ -439,19 +438,19 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 							.split("\n")
 							.filter(Boolean);
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
 			.setName("Allowed properties")
 			.setDesc(
-				"Only import properties with these labels, one per line, making the 'blocked properties' irrelevant"
+				"Only import properties with these labels, one per line, making the 'blocked properties' irrelevant",
 			)
 			.addTextArea((text) =>
 				text
 					.setPlaceholder("label1\nlabel2\n...")
 					.setValue(
-						this.plugin.settings.allowedProperties?.join("\n")
+						this.plugin.settings.allowedProperties?.join("\n"),
 					)
 					.onChange(async (value) => {
 						this.plugin.settings.allowedProperties = value
@@ -459,7 +458,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 							.split("\n")
 							.filter(Boolean);
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 	}
 }
