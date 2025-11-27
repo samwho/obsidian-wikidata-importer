@@ -67,7 +67,10 @@ export class Entity {
 	static async search(query: string, opts: SearchOptions): Promise<Entity[]> {
 		if (!query || query.length === 0) return [];
 		// support multiple comma-separated languages like "mul,en"
-		const languages = opts.language.split(",").map(l => l.trim()).filter(Boolean);
+		const languages = opts.language
+			.split(",")
+			.map((l) => l.trim())
+			.filter(Boolean);
 		const allResults = new Map<string, Entity>();
 		for (const lang of languages) {
 			const url =
@@ -81,19 +84,22 @@ export class Entity {
 				for (const result of json.search) {
 					if (!allResults.has(result.id)) {
 						allResults.set(result.id, Entity.fromJson(result));
-						}
 					}
-				} catch (e) {
-				console.warn(`Wikidata search failed for language "${lang}":`, e);
 				}
+			} catch (e) {
+				console.warn(
+					`Wikidata search failed for language "${lang}":`,
+					e,
+				);
 			}
+		}
 		return Array.from(allResults.values());
 	}
 
 	static replaceCharacters(
 		str: string,
 		searchString: string,
-		replaceString: string
+		replaceString: string,
 	) {
 		let result = str;
 
@@ -104,7 +110,7 @@ export class Entity {
 
 			result = result.replace(
 				new RegExp("\\" + searchChar, "g"),
-				replaceChar
+				replaceChar,
 			);
 		}
 
@@ -209,7 +215,7 @@ export class Entity {
 				var label = Entity.buildLink(
 					opts.internalLinkPrefix,
 					valueLabel,
-					id[0]
+					id[0],
 				);
 				toAdd = `[[${label}]]`;
 			}
