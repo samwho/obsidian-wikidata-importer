@@ -277,6 +277,24 @@ export default class WikidataImporterPlugin extends Plugin {
 	}
 }
 
+function languageValidationError(value: string): string | null {
+	const languages = value
+		.split(",")
+		.map((language) => language.trim().toLowerCase())
+		.filter(Boolean);
+	if (languages.length === 0) {
+		return "Must specify at least one language";
+	}
+
+	for (const language of languages) {
+		if (!language.match(/^[a-z]{2,}$/)) {
+			return `Invalid language code: "${language}"`;
+		}
+	}
+
+	return null;
+}
+
 class WikidataImporterSettingsTab extends PluginSettingTab {
 	plugin: WikidataImporterPlugin;
 
@@ -289,7 +307,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl)
+		const languageSetting = new Setting(containerEl)
 			.setName("Language")
 			.setDesc("The language to use for Wikidata entities")
 			.addText((text) =>
@@ -297,10 +315,25 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 					.setPlaceholder(DEFAULT_SETTINGS.language)
 					.setValue(this.plugin.settings.language)
 					.onChange(async (value) => {
+						if (languageValidationError(value)) {
+							return;
+						}
 						this.plugin.settings.language = value;
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		const languageInput = languageSetting.controlEl.querySelector("input");
+		if (languageInput) {
+			languageInput.addEventListener("blur", (e) => {
+				const value = languageInput.value;
+				const error = languageValidationError(value);
+				if (error) {
+					new Notice(error);
+					return;
+				}
+			});
+		}
 
 		new Setting(containerEl)
 			.setName("Wikidata entity ID key")

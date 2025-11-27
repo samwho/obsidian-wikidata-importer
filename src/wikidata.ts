@@ -78,7 +78,7 @@ export class Entity {
 		// support multiple comma-separated languages like "mul,en"
 		const languages = opts.language
 			.split(",")
-			.map((l) => l.trim())
+			.map((l) => l.trim().toLowerCase())
 			.filter(Boolean);
 		const allResults = new Map<string, Entity>();
 		for (const lang of languages) {
