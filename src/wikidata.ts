@@ -124,7 +124,11 @@ export class Entity {
 	}
 
 	static buildLink(link: string, label: string, id: string): string {
-		const sanitisedLabel = Entity.replaceCharacters(label, '*/:#?<>"', "_");
+		const sanitisedLabel = Entity.replaceCharacters(
+			label,
+			'*/:#?<>[]"',
+			"_",
+		);
 		return link
 			.replace(/\$\{label\}/g, sanitisedLabel)
 			.replace(/\$\{id\}/g, id);
