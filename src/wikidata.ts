@@ -178,7 +178,7 @@ export class Entity {
 				? r.normalizedValue.value
 				: null;
 			const type: string | null = r.valueType ? r.valueType.value : null;
-			const valueLabel: string | null = r.valueLabel
+			let valueLabel: string | null = r.valueLabel
 				? r.valueLabel.value
 				: null;
 
@@ -219,11 +219,14 @@ export class Entity {
 			} else if (isString(type)) {
 				toAdd = value;
 			} else if (value.match(/Q\d+$/) && valueLabel) {
-				const id = value.match(/\d+$/);
+				let id = value.match(/\d+$/)!;
 				if (!id) {
 					continue;
 				}
-				const label = Entity.buildLink(
+				if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
+					valueLabel = valueLabel.replace(/[^\d\p{L},.~!$&'()+,;=@]+/gu, opts.spaceReplacement);
+				}
+				var label = Entity.buildLink(
 					opts.internalLinkPrefix,
 					valueLabel,
 					id[0],
