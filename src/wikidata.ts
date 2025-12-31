@@ -85,12 +85,12 @@ export class Entity {
 			const url = `https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=${lang}&uselang=${lang}&type=item&limit=10&search=${encodeURIComponent(query)}`;
 			console.log("Wikidata search:", url);
 			try {
-		const response = await requestUrl(url);
-		const json: SearchResponse = response.json;
+				const response = await requestUrl(url);
+				const json: SearchResponse = response.json;
 				for (const result of json.search) {
 					if (!allResults.has(result.id)) {
 						allResults.set(result.id, Entity.fromJson(result));
-	}
+					}
 				}
 			} catch (e) {
 				console.warn(
