@@ -366,6 +366,20 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Replace")
+			.setDesc(
+				"If checked, the plethora of ID properties will not be imported",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.ignoreIDs)
+					.onChange(async (value) => {
+						this.plugin.settings.ignoreIDs = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Internal link prefix")
 			.setDesc(
 				"The prefix to use for internal links to Wikidata entities",
