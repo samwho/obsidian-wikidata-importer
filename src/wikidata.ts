@@ -22,6 +22,13 @@ export interface SearchOptions {
 	language: string;
 }
 
+export class EntityNotFoundError extends Error {
+	constructor(id: string) {
+		super(`Wikidata entity ${id} was not found`);
+		this.name = "EntityNotFoundError";
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Endpoints
 // ---------------------------------------------------------------------------
@@ -31,12 +38,12 @@ export interface SearchOptions {
  *  @see https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service/WDQS_graph_split */
 const WIKIDATA_SPARQL = "https://query.wikidata.org/sparql";
 
-/** QLever Wikidata mirror — full graph, including the scholarly-article split.
+/** QLever Wikidata mirror — third-party full graph, including scholarly items.
  *  Differences from Blazegraph:
  *  - Does NOT support the wikibase:label SERVICE; labels fetched via rdfs:label.
  *  - Does NOT accept &format=json; format negotiated via Accept header only.
  *  - Requires explicit PREFIX declarations (Blazegraph injects them implicitly). */
-const QLEVER_SPARQL = "https://qlever.cs.uni-freiburg.de/api/wikidata";
+const QLEVER_SPARQL = "https://qlever.dev/api/wikidata";
 
 // ---------------------------------------------------------------------------
 // Prefixes (QLever only — Blazegraph injects these automatically)
@@ -68,18 +75,6 @@ PREFIX bd: <http://www.bigdata.com/rdf#>
 // ---------------------------------------------------------------------------
 
 /**
- * Parse the user-supplied language setting into an ordered list of real BCP-47
- * language tags.
- *
- * "mul" is a Wikidata-internal pseudo-code meaning "multiple languages". It is
- * accepted by the Wikidata action API but is NOT a valid BCP-47 tag and will
- * silently match nothing inside a SPARQL FILTER(LANG(...)) expression or the
- * wikibase:label SERVICE. It is therefore stripped here.
- *
- * "en" is appended as a final fallback when not already present, ensuring
- * labels are never silently dropped when the preferred language is unavailable.
- */
-/**
  * Languages for use with the wikibase:label SERVICE and FILTER(LANG(...)).
  * "mul" is stripped because it is not a valid BCP-47 tag and silently matches
  * nothing in those contexts. "en" is added as a fallback.
@@ -95,10 +90,9 @@ function parseLangs(language: string): string[] {
 }
 
 /**
- * Languages for use with QLever rdfs:label FILTER — identical to parseLangs
- * but retains "mul". Wikidata stores many scholarly article titles and other
- * language-neutral strings under the "mul" language tag in the raw RDF, so
- * FILTER(LANG(?label) = "mul") is valid and necessary against QLever.
+ * Languages for use with QLever rdfs:label fallback. This retains "mul"
+ * because Wikidata stores many scholarly article titles and other
+ * language-neutral strings under that tag in the raw RDF.
  */
 function parseLangsForRdfs(language: string): string[] {
 	const langs = language
@@ -113,11 +107,27 @@ function parseLangsForRdfs(language: string): string[] {
 }
 
 /**
- * Build a SPARQL FILTER clause that accepts any of the given language tags:
- *   FILTER(LANG(?x) = "de" || LANG(?x) = "en")
+ * Build SPARQL that binds exactly one label using the configured language
+ * order. This avoids QLever returning one result row per matching language.
  */
-function langFilter(variable: string, langs: string[]): string {
-	return langs.map((l) => `LANG(${variable}) = "${l}"`).join(" || ");
+function preferredRdfsLabel(
+	entityVariable: string,
+	labelVariable: string,
+	langs: string[],
+): string {
+	const labelCandidates = langs.map((_, i) => `${labelVariable}${i}`);
+	const optionalLabels = langs
+		.map(
+			(lang, i) => `
+				OPTIONAL {
+					${entityVariable} rdfs:label ${labelCandidates[i]} .
+					FILTER(LANG(${labelCandidates[i]}) = "${lang}")
+				}`,
+		)
+		.join("");
+
+	return `${optionalLabels}
+				BIND(COALESCE(${labelCandidates.join(", ")}) AS ${labelVariable})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,16 +179,15 @@ async function runSparql(
 		? `${endpoint}?query=${encodeURIComponent(query)}`
 		: `${endpoint}?query=${encodeURIComponent(query)}&format=json`;
 
-	try {
-		const response = await requestUrl({
-			url,
-			headers: { Accept: "application/sparql-results+json" },
-		});
-		return response.json?.results?.bindings ?? [];
-	} catch (e) {
-		console.warn(`[wikidata-importer] SPARQL query failed (${endpoint}):`, e);
-		return [];
+	const response = await requestUrl({
+		url,
+		headers: { Accept: "application/sparql-results+json" },
+	});
+	const bindings = response.json?.results?.bindings;
+	if (!Array.isArray(bindings)) {
+		throw new Error(`Invalid SPARQL response from ${endpoint}`);
 	}
+	return bindings;
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +258,11 @@ export class Entity {
 					try {
 						allResults.set(result.id, Entity.fromJson(result));
 					} catch (e) {
-						console.warn(`[wikidata-importer] Skipping invalid search result:`, result, e);
+						console.warn(
+							`[wikidata-importer] Skipping invalid search result:`,
+							result,
+							e,
+						);
 					}
 				}
 			} catch (e) {
@@ -281,7 +294,11 @@ export class Entity {
 		return result;
 	}
 
-	static buildLink(link: string, label: string | undefined, id: string): string {
+	static buildLink(
+		link: string,
+		label: string | undefined,
+		id: string,
+	): string {
 		label = label ?? "";
 		const sanitisedLabel = Entity.replaceCharacters(
 			label,
@@ -321,14 +338,8 @@ export class Entity {
 		const rdfsLangs = parseLangsForRdfs(opts.language);
 		const labelFragment = useRdfsLabel
 			? `
-				OPTIONAL {
-					?property rdfs:label ?propertyLabel .
-					FILTER(${langFilter("?propertyLabel", rdfsLangs)})
-				}
-				OPTIONAL {
-					?value rdfs:label ?valueLabel .
-					FILTER(${langFilter("?valueLabel", rdfsLangs)})
-				}`
+				${preferredRdfsLabel("?property", "?propertyLabel", langs)}
+				${preferredRdfsLabel("?value", "?valueLabel", rdfsLangs)}`
 			: `
 				SERVICE wikibase:label {
 					bd:serviceParam wikibase:language "${langs.join(",")}" .
@@ -353,7 +364,7 @@ export class Entity {
 			`;
 		}
 
-		query += labelFragment + "\n\t\t}";
+		query += `${labelFragment}\n\t\t}`;
 		return query;
 	}
 
@@ -452,8 +463,8 @@ export class Entity {
 	 *
 	 * - **Blazegraph** (`query.wikidata.org`) — authoritative for the majority
 	 *   of Wikidata entities.
-	 * - **QLever** (`qlever.cs.uni-freiburg.de`) — full Wikidata graph mirror,
-	 *   required for scholarly articles which were moved out of the Blazegraph.
+	 * - **QLever** (`qlever.dev`) — third-party full Wikidata graph mirror,
+	 *   used for scholarly articles which were moved out of the main graph.
 	 *   @see https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service/WDQS_graph_split
 	 *
 	 * Duplicate property values across both responses are deduplicated before
@@ -463,16 +474,17 @@ export class Entity {
 		const ret: Properties = {};
 
 		const [wdResults, qlResults] = await Promise.all([
-			runSparql(
-				WIKIDATA_SPARQL,
-				this.buildPropertiesQuery(opts, false),
-			),
+			runSparql(WIKIDATA_SPARQL, this.buildPropertiesQuery(opts, false)),
 			runSparql(
 				QLEVER_SPARQL,
 				WIKIDATA_PREFIXES + this.buildPropertiesQuery(opts, true),
 				true,
 			),
 		]);
+
+		if (wdResults.length === 0 && qlResults.length === 0) {
+			throw new EntityNotFoundError(this.id);
+		}
 
 		this.parseBindings(wdResults, opts, ret);
 		this.parseBindings(qlResults, opts, ret);
