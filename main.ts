@@ -9,7 +9,7 @@ import {
 	TFile,
 } from "obsidian";
 
-import { Entity } from "./src/wikidata";
+import { Entity, EntityNotFoundError } from "./src/wikidata";
 
 interface WikidataImporterSettings {
 	entityIdKey: string;
@@ -27,6 +27,7 @@ interface WikidataImporterSettings {
 
 const DEFAULT_SETTINGS: WikidataImporterSettings = {
 	entityIdKey: "wikidata entity id",
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: this is intentional
 	internalLinkPrefix: "db/${label}",
 	spaceReplacement: "",
 	ignoreCategories: true,
@@ -116,6 +117,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 
 		try {
 			if (this.plugin.settings.internalLinkPrefix === "db/") {
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: this is intentional
 				this.plugin.settings.internalLinkPrefix = "db/${label}";
 			}
 
@@ -150,7 +152,7 @@ class WikidataEntitySuggestModal extends SuggestModal<Entity> {
 }
 
 export default class WikidataImporterPlugin extends Plugin {
-	settings: WikidataImporterSettings;
+	settings!: WikidataImporterSettings;
 
 	async importProperties() {
 		const file = this.app.workspace.getActiveFile();
@@ -168,7 +170,7 @@ export default class WikidataImporterPlugin extends Plugin {
 				"https://www.wikidata.org/wiki/".length,
 			);
 		}
-		if (!entityId || !entityId.startsWith("Q")) {
+		if (!entityId?.startsWith("Q")) {
 			new Notice(
 				`No Wikidata entity ID found in frontmatter key "${this.settings.entityIdKey}", searching for a Wikidata entity from the file name "${file.basename}"...`,
 			);
@@ -184,6 +186,10 @@ export default class WikidataImporterPlugin extends Plugin {
 		try {
 			await syncEntityToFile(this, entity, file);
 		} catch (e) {
+			if (e instanceof EntityNotFoundError) {
+				new Notice(e.message);
+				return;
+			}
 			new Notice(
 				`Error importing properties for entity ${entity.id}: ${e}`,
 			);
@@ -325,7 +331,7 @@ class WikidataImporterSettingsTab extends PluginSettingTab {
 
 		const languageInput = languageSetting.controlEl.querySelector("input");
 		if (languageInput) {
-			languageInput.addEventListener("blur", (e) => {
+			languageInput.addEventListener("blur", () => {
 				const value = languageInput.value;
 				const error = languageValidationError(value);
 				if (error) {
