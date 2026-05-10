@@ -433,7 +433,7 @@ export class Entity {
 					if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
 						valueLabel = valueLabel.replace(/[^\d\p{L},.~!$&'()+,;=@]+/gu, opts.spaceReplacement);
 					}
-					var label = Entity.buildLink(
+					const label = Entity.buildLink(
 						opts.internalLinkPrefix,
 						valueLabel,
 						entityMatch[2], // numeric part only, matching original behaviour
