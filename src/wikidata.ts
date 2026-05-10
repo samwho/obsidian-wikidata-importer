@@ -219,7 +219,7 @@ export class Entity {
 			typeof json.label === "string" ? json.label : undefined,
 			typeof json.description === "string" ? json.description : undefined,
 		);
-		}
+	}
 
 	static fromId(id: string): Entity {
 		return new Entity(id);
@@ -366,7 +366,7 @@ export class Entity {
 
 		query += `${labelFragment}\n\t\t}`;
 		return query;
-				}
+	}
 
 	// -------------------------------------------------------------------------
 	// Binding parser
@@ -436,7 +436,7 @@ export class Entity {
 					var label = Entity.buildLink(
 						opts.internalLinkPrefix,
 						valueLabel,
-							entityMatch[2], // numeric part only, matching original behaviour
+						entityMatch[2], // numeric part only, matching original behaviour
 					);
 					toAdd = `[[${label}]]`;
 				}
@@ -447,7 +447,7 @@ export class Entity {
 			if (ret[key]) {
 				const strVal = String(toAdd);
 				if (!ret[key].some((v) => String(v) === strVal)) {
-				ret[key].push(toAdd);
+					ret[key].push(toAdd);
 				}
 			} else {
 				ret[key] = [toAdd];
