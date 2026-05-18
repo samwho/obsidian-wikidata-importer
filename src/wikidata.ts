@@ -393,7 +393,7 @@ export class Entity {
 			const normalizedValue: string | null =
 				r.normalizedValue?.value ?? null;
 			const type: string | null = r.valueType?.value ?? null;
-			const valueLabel: string | null = r.valueLabel?.value ?? null;
+			let valueLabel: string | null = r.valueLabel?.value ?? null;
 
 			if (opts.ignoreCategories && valueLabel?.startsWith("Category:")) {
 				continue;
@@ -430,6 +430,9 @@ export class Entity {
 				// Entity-valued property: value URL ends in /Q<digits>
 				const entityMatch = value.match(/\/(Q(\d+))$/);
 				if (entityMatch && valueLabel) {
+					if (opts.spaceReplacement && opts.spaceReplacement.length > 0) {
+						valueLabel = valueLabel.replace(/[^\d\p{L},.~!$&'()+,;=@]+/gu, opts.spaceReplacement);
+					}
 					const label = Entity.buildLink(
 						opts.internalLinkPrefix,
 						valueLabel,
